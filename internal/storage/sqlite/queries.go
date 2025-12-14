@@ -873,9 +873,12 @@ func (s *SQLiteStorage) CreateTombstone(ctx context.Context, id string, actor st
 	originalType := string(issue.IssueType)
 
 	// Convert issue to tombstone
+	// Note: closed_at must be set to NULL because of CHECK constraint:
+	// (status = 'closed') = (closed_at IS NOT NULL)
 	_, err = tx.ExecContext(ctx, `
 		UPDATE issues
 		SET status = ?,
+		    closed_at = NULL,
 		    deleted_at = ?,
 		    deleted_by = ?,
 		    delete_reason = ?,
@@ -1191,7 +1194,7 @@ func (s *SQLiteStorage) executeDelete(ctx context.Context, tx *sql.Tx, inClause 
 	for rows.Next() {
 		var id, issueType string
 		if err := rows.Scan(&id, &issueType); err != nil {
-			_ = rows.Close()
+			_ = rows.Close() // #nosec G104 - error handling not critical in error path
 			return fmt.Errorf("failed to scan issue type: %w", err)
 		}
 		issueTypes[id] = issueType
